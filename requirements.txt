@@ -2,7 +2,7 @@ fastapi
 uvicorn
 pandas
 numpy
-scikit-learn==1.4.2
+scikit-learn
 imbalanced-learn
 joblib
 pydantic
