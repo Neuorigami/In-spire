@@ -1,0 +1,1801 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AmbuPredict — Ventilation Outcome Predictor</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@500;600;700;800&family=DM+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box
+    }
+
+    :root {
+      --bg: #050505;
+      --surface: rgba(20, 25, 35, 0.6);
+      --surface2: rgba(35, 45, 60, 0.5);
+      --border: rgba(255, 255, 255, 0.08);
+      --border2: rgba(255, 255, 255, 0.15);
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #00f2fe;
+      --accent2: #4facfe;
+      --warn: #fbbf24;
+      --danger: #f87171;
+      --high: #00f2fe;
+      --mod: #fbbf24;
+      --low: #f87171;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0, 242, 254, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 242, 254, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
+    }
+
+
+    /* Navigation */
+    .nav-bar {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 30px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    .nav-item {
+      cursor: pointer;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: 18px;
+      color: var(--muted);
+      padding: 8px 16px;
+      border-radius: 8px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .nav-item.active {
+      background: rgba(0, 242, 254, 0.1);
+      color: var(--accent);
+      box-shadow: 0 0 15px rgba(0, 242, 254, 0.05);
+    }
+
+    .nav-item:hover:not(.active) {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+      transform: translateY(-1px);
+    }
+
+    /* Home Section */
+    #home-section {
+      animation: fadeUp .4s ease;
+    }
+
+    .home-hero {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .home-hero h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 48px;
+      font-weight: 800;
+      background: linear-gradient(to right, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 15px;
+    }
+
+    .home-hero p {
+      font-size: 18px;
+      color: var(--text);
+      max-width: 800px;
+      margin: 0 auto 10px;
+      line-height: 1.6;
+    }
+
+    .home-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 30px;
+      font-size: 15px;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .home-table th,
+    .home-table td {
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .home-table th {
+      background: var(--surface2);
+      font-family: 'Outfit', sans-serif;
+      color: var(--accent);
+    }
+
+    .home-card {
+      background: var(--surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 25px;
+      margin-bottom: 25px;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .home-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      border-color: var(--border2);
+    }
+
+    .home-card h3 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 15px;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    .home-list {
+      list-style: none;
+    }
+
+    .home-list li {
+      margin-bottom: 10px;
+      padding-left: 20px;
+      position: relative;
+      line-height: 1.5;
+    }
+
+    .home-list li::before {
+      content: '•';
+      color: var(--accent);
+      position: absolute;
+      left: 0;
+      font-size: 20px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 40px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      box-shadow: 0 4px 15px rgba(0, 242, 254, 0.3);
+    }
+
+    .logo-text {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      font-size: 22px;
+      letter-spacing: -0.5px;
+    }
+
+    .logo-text span {
+      color: var(--accent);
+    }
+
+    .header-badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 14px;
+      color: var(--text);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+
+    .api-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--danger);
+      transition: background .3s;
+      box-shadow: 0 0 8px var(--danger);
+    }
+
+    .status-dot.ok {
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    /* Section labels */
+    .section-label {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(to right, var(--border), transparent);
+    }
+
+    /* Two-column layout */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media(max-width:700px) {
+
+      .grid,
+      .grid-3 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      border-color: var(--border2);
+    }
+
+    .card-title {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text);
+      letter-spacing: 0.5px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Form fields */
+    .field {
+      margin-bottom: 16px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .field select,
+    .field input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      outline: none;
+      transition: all .3s ease;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    .field select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2394a3b8' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 36px;
+    }
+
+    .field select:hover,
+    .field input:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .field select:focus,
+    .field input:focus {
+      border-color: var(--accent2);
+      box-shadow: 0 0 0 4px rgba(79, 172, 254, 0.15);
+      background: rgba(35, 45, 60, 0.7);
+    }
+
+    .field input[type=number]::-webkit-inner-spin-button {
+      opacity: 0.4;
+      transition: opacity .2s;
+    }
+
+    .field input[type=number]:hover::-webkit-inner-spin-button {
+      opacity: 0.8;
+    }
+
+    /* Machine settings highlight */
+    .machine-card {
+      border-color: rgba(0, 242, 254, 0.3);
+      background: linear-gradient(135deg, rgba(0, 242, 254, 0.05), var(--surface));
+    }
+
+    .machine-card .field select,
+    .machine-card .field input {
+      border-color: rgba(0, 242, 254, 0.2);
+    }
+
+    /* SpO2 grid */
+    .spo2-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    @media(max-width:500px) {
+      .spo2-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .spo2-field label {
+      font-size: 14px;
+    }
+
+    /* Submit button */
+    .btn-predict {
+      width: 100%;
+      padding: 16px;
+      margin-top: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #000;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: 0.5px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all .3s ease;
+      box-shadow: 0 4px 15px rgba(0, 242, 254, 0.3);
+    }
+
+    .btn-predict:hover {
+      opacity: 0.95;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 242, 254, 0.4);
+    }
+
+    .btn-predict:active {
+      transform: translateY(1px);
+      box-shadow: 0 2px 10px rgba(0, 242, 254, 0.3);
+    }
+
+    .btn-predict:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* Result panel */
+    #result-panel {
+      display: none;
+      margin-top: 32px;
+      animation: fadeUp .5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(24px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
+    }
+
+    .result-card {
+      border-radius: 16px;
+      padding: 32px;
+      border: 1px solid var(--border2);
+      background: var(--surface);
+      backdrop-filter: blur(12px);
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .result-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+    }
+
+    .result-card.negative::before {
+      background: linear-gradient(90deg, var(--danger), #ff6b35);
+    }
+
+    .result-card.moderate::before {
+      background: linear-gradient(90deg, var(--warn), #f97316);
+    }
+
+    .result-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 28px;
+    }
+
+    .result-outcome {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      font-size: 32px;
+    }
+
+    .result-outcome.positive {
+      color: var(--high);
+    }
+
+    .result-outcome.negative {
+      color: var(--low);
+    }
+
+    .risk-badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 15px;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 20px;
+      letter-spacing: 1px;
+    }
+
+    .risk-badge.HIGH {
+      background: rgba(0, 242, 254, 0.15);
+      color: var(--high);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      box-shadow: 0 0 10px rgba(0, 242, 254, 0.2);
+    }
+
+    .risk-badge.MODERATE {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--warn);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .risk-badge.LOW {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--low);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    /* Probability gauge */
+    .gauge-wrap {
+      margin-bottom: 24px;
+    }
+
+    .gauge-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 16px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-family: 'DM Mono', monospace;
+    }
+
+    .gauge-track {
+      height: 10px;
+      background: var(--surface2);
+      border-radius: 5px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .gauge-fill {
+      height: 100%;
+      border-radius: 5px;
+      transition: width 1s cubic-bezier(.4, 0, .2, 1);
+      background: linear-gradient(90deg, var(--accent2), var(--accent));
+    }
+
+    .gauge-fill.low-risk {
+      background: linear-gradient(90deg, #ff6b35, var(--danger));
+    }
+
+    .gauge-fill.mod-risk {
+      background: linear-gradient(90deg, #f97316, var(--warn));
+    }
+
+    .gauge-pct {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      font-size: 48px;
+      color: var(--text);
+      margin: 12px 0 4px;
+    }
+
+    /* Clinical advice */
+    .advice-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+      font-size: 15.5px;
+      line-height: 1.6;
+      color: var(--text);
+    }
+
+    .advice-box strong {
+      color: var(--accent);
+      display: block;
+      font-size: 17px;
+      font-family: 'DM Mono', monospace;
+      letter-spacing: 1px;
+      margin-bottom: 5px;
+    }
+
+    /* Feature importances */
+    .factors-title {
+      font-family: 'DM Mono', monospace;
+      font-size: 17px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .factor-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .factor-name {
+      font-family: 'DM Mono', monospace;
+      font-size: 16px;
+      color: var(--text);
+      min-width: 130px;
+    }
+
+    .factor-bar-wrap {
+      flex: 1;
+      height: 6px;
+      background: var(--surface2);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .factor-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent2), var(--accent));
+      border-radius: 3px;
+      transition: width .8s ease;
+    }
+
+    .factor-val {
+      font-family: 'DM Mono', monospace;
+      font-size: 17px;
+      color: var(--muted);
+      min-width: 40px;
+      text-align: right;
+    }
+
+    /* Error state */
+    .error-box {
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      border-radius: 10px;
+      padding: 14px 16px;
+      color: var(--danger);
+      font-size: 17px;
+      margin-top: 12px;
+      display: none;
+    }
+
+    /* Loading spinner */
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(0, 0, 0, 0.3);
+      border-top-color: #000;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    /* Footer note */
+    .footer-note {
+      margin-top: 32px;
+      text-align: center;
+      font-size: 16px;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+    }
+
+    /* SpO2 chart card */
+    .chart-card {
+      background: var(--surface);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      transition: transform 0.3s ease;
+    }
+
+    .chart-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--border2);
+    }
+
+    .chart-card canvas {
+      max-height: 220px;
+    }
+
+    /* Action row */
+    .action-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .btn-reset {
+      padding: 16px 24px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all .3s ease;
+      white-space: nowrap;
+    }
+
+    .btn-reset:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(0, 242, 254, 0.05);
+      transform: translateY(-2px);
+    }
+
+    .btn-demo {
+      padding: 16px 24px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all .3s ease;
+      white-space: nowrap;
+    }
+
+    .btn-demo:hover {
+      border-color: var(--warn);
+      color: var(--warn);
+      background: rgba(251, 191, 36, 0.05);
+      transform: translateY(-2px);
+    }
+
+    /* Demo mode banner */
+    .demo-banner {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      border-radius: 10px;
+      padding: 10px 16px;
+      margin-bottom: 20px;
+      font-size: 16px;
+      color: var(--warn);
+      font-family: 'DM Mono', monospace;
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* History panel */
+    .history-section {
+      margin-top: 40px;
+    }
+
+    .history-empty {
+      color: var(--muted);
+      font-size: 17px;
+      font-family: 'DM Mono', monospace;
+      padding: 20px 0;
+      text-align: center;
+    }
+
+    .history-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all .3s ease;
+    }
+
+    .history-row:hover {
+      border-color: var(--accent);
+      transform: translateX(4px);
+      background: rgba(30, 41, 59, 0.9);
+    }
+
+    .hist-num {
+      font-family: 'DM Mono', monospace;
+      font-size: 15px;
+      color: var(--muted);
+      min-width: 28px;
+    }
+
+    .hist-patient {
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .hist-patient span {
+      font-size: 14px;
+      color: var(--muted);
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      display: block;
+      margin-top: 4px;
+    }
+
+    .hist-prob {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+    }
+
+    .hist-prob.positive {
+      color: var(--high);
+    }
+
+    .hist-prob.negative {
+      color: var(--low);
+    }
+
+    .hist-badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 14px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+
+    .hist-badge.HIGH {
+      background: rgba(0, 242, 254, 0.12);
+      color: var(--high);
+    }
+
+    .hist-badge.MODERATE {
+      background: rgba(245, 158, 11, 0.12);
+      color: var(--warn);
+    }
+
+    .hist-badge.LOW {
+      background: rgba(239, 68, 68, 0.12);
+      color: var(--low);
+    }
+
+    .hist-time {
+      font-family: 'DM Mono', monospace;
+      font-size: 17px;
+      color: var(--muted);
+    }
+
+    .btn-clear-hist {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 17px;
+      padding: 4px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all .2s;
+    }
+
+    .btn-clear-hist:hover {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrapper">
+
+    <!-- Header -->
+    <header>
+      <div class="logo">
+        <div class="logo-icon">🫁</div>
+        <div>
+          <div class="logo-text">Ambu<span>Predict</span></div>
+          <div style="font-size:17px;color:var(--muted);margin-top:1px;">NeuO In-Spire · Outcome Predictor</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        <div class="api-status">
+          <div class="status-dot" id="status-dot"></div>
+          <span id="status-text">Connecting...</span>
+        </div>
+        <div class="header-badge">v1.0 · Clinical</div>
+      </div>
+    </header>
+
+    <div class="nav-bar">
+      <div class="nav-item active" onclick="switchTab('home')" id="nav-home">Home</div>
+      <div class="nav-item" onclick="switchTab('add')" id="nav-add">Add Patient</div>
+      <div class="nav-item" onclick="switchTab('predictor')" id="nav-predictor">Predictor</div>
+    </div>
+
+
+    <!-- Home Section -->
+    <div id="home-section">
+      <div class="home-hero">
+        <h1>NeuO In-Spire®</h1>
+        <p style="font-size: 24px; font-weight: bold; margin-bottom: 20px;">Resuscitator Automation System</p>
+        <p>An electro-mechanical device to enhance the utility of the existing Bag valve mask and automate the same.</p>
+        <p>Automate a premium bag valve mask, by sensing the patient's breathing pattern and pump the air+O2
+          accordingly.</p>
+        <p style="color: var(--accent); font-weight: bold; margin-top: 20px;">Our solution theoretically and
+          statistically saves more lives compared to a patient under bag valve mask operated by an untrained attender.
+        </p>
+      </div>
+
+      <div class="grid">
+        <div class="home-card">
+          <h3>Product Readiness & Specs</h3>
+          <p><strong>Certification:</strong> IEC 60601</p>
+          <p><strong>IPR Patent no:</strong> 202141007307</p>
+          <p><strong>IPR Copyright no:</strong> 4799095</p>
+          <h4 style="margin: 15px 0 10px; color: var(--accent2);">Major Settings:</h4>
+          <ul class="home-list">
+            <li><strong>Breaths per minute (BPM):</strong> 15, 20, 25, 30</li>
+            <li><strong>Tidal volume:</strong> Low (200-250 ml), Medium (250-350 ml), High (450-550 ml)</li>
+            <li><strong>PEEP valve:</strong> Yes</li>
+            <li><strong>Oxygen Input:</strong> Up to 15 LPM</li>
+            <li><strong>Mode:</strong> Low, medium, high, assist control low*, assist control medium*, assist control
+              high*</li>
+            <li><strong>Alarm:</strong> During no pressure, During battery mode, Serious injury</li>
+            <li><strong>Pressure relief valve:</strong> Yes, 40 cm of Water (safety lock)</li>
+            <li><strong>Battery Backup:</strong> Minimum 2 hours with inverter</li>
+          </ul>
+        </div>
+
+        <div class="home-card">
+          <h3>Market & Impact</h3>
+          <h4 style="margin: 0 0 10px; color: var(--accent2);">Socio-Economic Impact</h4>
+          <ul class="home-list">
+            <li>In Rural India, Bag valve masks are mostly operated by untrained attendants. They are not aware on how
+              much and how long it has to be used.</li>
+            <li>None of the district hospitals have ventilator support.</li>
+            <li>Big hospitals need In-spire as they get huge inflow of emergency cases every day, for resuscitation,
+              however they cannot use ventilators until the patient is evaluated.</li>
+            <li>Rural Indian Hospitals cannot afford ventilators as they are too expensive and difficult to maintain in
+              rough conditions.</li>
+          </ul>
+          <h4 style="margin: 15px 0 10px; color: var(--accent2);">Market Opportunity</h4>
+          <ul class="home-list">
+            <li>Need of breathing assistance is high during: Organ failure, Blood infections, Heart problems, Lung
+              problems, Brain trauma</li>
+            <li>Patients in need of medical ventilators who are in transit beds</li>
+            <li>ICUs in need of Backup breathing assistance</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="home-card">
+        <h3>Comparison: Uniqueness on Features</h3>
+        <div style="overflow-x: auto;">
+          <table class="home-table">
+            <thead>
+              <tr>
+                <th>Features</th>
+                <th>AMBU Bags</th>
+                <th>Transport Ventilators</th>
+                <th>Medical Ventilators</th>
+                <th style="background: rgba(0,212,170,0.15);">INSPIRE</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Automatic</td>
+                <td>no</td>
+                <td>yes</td>
+                <td>yes</td>
+                <td style="color:var(--accent);font-weight:bold;">yes</td>
+              </tr>
+              <tr>
+                <td>Manual Switch over</td>
+                <td>NA</td>
+                <td>no</td>
+                <td>no</td>
+                <td style="color:var(--accent);font-weight:bold;">yes</td>
+              </tr>
+              <tr>
+                <td>Portable</td>
+                <td>yes</td>
+                <td>yes</td>
+                <td>bulky</td>
+                <td style="color:var(--accent);font-weight:bold;">yes</td>
+              </tr>
+              <tr>
+                <td>Pressure Gauge</td>
+                <td>no</td>
+                <td>yes</td>
+                <td>yes</td>
+                <td style="color:var(--accent);font-weight:bold;">yes</td>
+              </tr>
+              <tr>
+                <td>Flow rate gauge</td>
+                <td>no</td>
+                <td>yes</td>
+                <td>yes</td>
+                <td style="color:var(--accent);font-weight:bold;">yes</td>
+              </tr>
+              <tr>
+                <td>Cost</td>
+                <td>low</td>
+                <td>Very high</td>
+                <td>Very high</td>
+                <td style="color:var(--accent);font-weight:bold;">medium</td>
+              </tr>
+              <tr>
+                <td>Gas Tank - O2</td>
+                <td>optional</td>
+                <td>Always Needed</td>
+                <td>Always Needed</td>
+                <td style="color:var(--accent);font-weight:bold;">optional</td>
+              </tr>
+              <tr>
+                <td>Cost in INR</td>
+                <td>1500</td>
+                <td>3 Lakh +</td>
+                <td>25 Lakh +</td>
+                <td style="color:var(--accent);font-weight:bold;">1.2 Lakhs</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Predictor Section -->
+    <div id="predictor-section" style="display: none;">
+
+
+      <!-- Demo mode banner -->
+      <div class="demo-banner" id="demo-banner">
+        ⚡ DEMO MODE — API offline. Showing simulated predictions for presentation purposes.
+      </div>
+
+      <!-- Add Patient Instructions -->
+      <div class="demo-banner" id="add-patient-banner"
+        style="display:none; background:rgba(0,212,170,0.1); border-color:rgba(0,212,170,0.3); color:var(--accent);">
+        💡 ADD PATIENT MODE — Enter the patient's vitals and machine settings, then select the actual outcome at the
+        bottom to retrain the AI model with real data!
+      </div>
+
+      <!-- Machine Settings -->
+      <div class="section-label">In-Spire Machine Settings</div>
+      <div class="card machine-card" style="margin-bottom:20px;">
+        <div class="grid-3">
+          <div class="field">
+            <label>BPM (Breaths/min)</label>
+            <select id="bpm">
+              <option value="15">15 BPM</option>
+              <option value="20">20 BPM</option>
+              <option value="25" selected>25 BPM</option>
+              <option value="30">30 BPM</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Ventilation Mode</label>
+            <select id="mode">
+              <option>Low</option>
+              <option>Medium</option>
+              <option selected>High</option>
+              <option>Assist Control</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>PEEP (cm H₂O)</label>
+            <select id="peep">
+              <option value="0">0</option>
+              <option value="5">5</option>
+              <option value="10" selected>10</option>
+              <option value="15">15</option>
+              <option value="20">20</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0;max-width:260px;">
+          <label>O₂ Flow Rate (LPM)</label>
+          <input type="number" id="lpm" value="8" min="1" max="20" step="0.5" />
+        </div>
+      </div>
+
+      <!-- Patient Info + Vitals -->
+      <div class="grid">
+        <div class="card">
+          <div class="card-title">Patient Information</div>
+          <div class="grid">
+            <div class="field">
+              <label>Age</label>
+              <input type="number" id="age" value="45" min="1" max="120" />
+            </div>
+            <div class="field">
+              <label>Gender</label>
+              <select id="gender">
+                <option>Male</option>
+                <option>Female</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label>Condition</label>
+            <select id="condition">
+              <option>Cardiac Arrest</option>
+              <option>Drug Overdose</option>
+              <option>Post-Surgical</option>
+              <option selected>Respiratory Failure</option>
+              <option>Stroke/CNS</option>
+              <option>Trauma</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Comorbidity</label>
+            <select id="comorbidity">
+              <option selected>None</option>
+              <option>Hypertension</option>
+              <option>Diabetes</option>
+              <option>COPD</option>
+              <option>Heart Disease</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Pre-Intubation Vitals</div>
+          <div class="grid">
+            <div class="field">
+              <label>Pulse (bpm)</label>
+              <input type="number" id="pulse" value="95" min="20" max="250" />
+            </div>
+            <div class="field">
+              <label>GCS Score (3–15)</label>
+              <input type="number" id="gcs" value="12" min="3" max="15" />
+            </div>
+          </div>
+          <div class="grid">
+            <div class="field">
+              <label>BP Systolic</label>
+              <input type="number" id="bp_sys" value="120" min="60" max="250" />
+            </div>
+            <div class="field">
+              <label>BP Diastolic</label>
+              <input type="number" id="bp_dia" value="80" min="30" max="150" />
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>CVS Score (1–5)</label>
+            <input type="number" id="cvs" value="3" min="1" max="5" />
+          </div>
+        </div>
+      </div>
+
+      <!-- SpO2 readings -->
+      <div class="section-label" style="margin-top:20px;" id="spo2-section-label">SpO₂ at Admission</div>
+      <div class="card" style="margin-bottom:20px;">
+        <div class="spo2-grid" id="spo2-admission-grid">
+          <div class="field spo2-field">
+            <label>SpO₂ at Admission (%)</label>
+            <input type="number" id="spo2_0" value="72" min="30" max="100" />
+          </div>
+        </div>
+        <div class="spo2-grid" id="spo2-trajectory-grid" style="display:none; margin-top:12px;">
+          <div class="field spo2-field">
+            <label>5 min (%)</label>
+            <input type="number" id="spo2_5" value="76" min="30" max="100" />
+          </div>
+          <div class="field spo2-field">
+            <label>10 min (%)</label>
+            <input type="number" id="spo2_10" value="80" min="30" max="100" />
+          </div>
+          <div class="field spo2-field">
+            <label>15 min (%)</label>
+            <input type="number" id="spo2_15" value="84" min="30" max="100" />
+          </div>
+          <div class="field spo2-field">
+            <label>20 min (%)</label>
+            <input type="number" id="spo2_20" value="87" min="30" max="100" />
+          </div>
+          <div class="field spo2-field">
+            <label>25 min (%)</label>
+            <input type="number" id="spo2_25" value="90" min="30" max="100" />
+          </div>
+          <div class="field spo2-field" style="grid-column:span 2;">
+            <label>30 min (%) — final reading</label>
+            <input type="number" id="spo2_30" value="93" min="30" max="100" />
+          </div>
+        </div>
+      </div>
+
+      <!-- SpO2 Live Chart -->
+      <div class="section-label" style="margin-top:0; display:none;" id="spo2-chart-label">SpO₂ Trajectory Preview</div>
+      <div class="chart-card" style="margin-bottom:20px; display:none;" id="spo2-chart-card">
+        <canvas id="spo2-chart"></canvas>
+      </div>
+
+      <!-- Action buttons -->
+
+      <div class="card" id="outcome-card" style="display:none; margin-bottom: 20px; border-color: var(--accent);">
+        <div class="card-title">Actual Outcome</div>
+        <div class="field" style="margin-bottom:0;">
+          <label>Did the ventilation succeed?</label>
+          <select id="actual-outcome">
+            <option value="1">Positive (Success)</option>
+            <option value="0">Negative (Failure)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button class="btn-predict" id="predict-btn" onclick="runPrediction()" style="flex:1;">
+          Run Prediction
+        </button>
+        <button class="btn-predict" id="add-btn" onclick="addPatientAndRetrain()"
+          style="flex:1; display:none; background: linear-gradient(135deg, var(--warn), #f97316);">
+          Add & Retrain
+        </button>
+        <button class="btn-demo" onclick="fillDemoData()">⚡ Quick Fill Demo Data</button>
+        <button class="btn-reset" onclick="resetForm()">↺ Reset</button>
+      </div>
+      <div class="error-box" id="error-box"></div>
+
+      <!-- Result panel -->
+      <div id="result-panel">
+        <div class="section-label" style="margin-top:28px;">Prediction Result</div>
+        <div class="result-card" id="result-card">
+          <div class="result-header">
+            <div>
+              <div
+                style="font-size:17px;font-family:'DM Mono',monospace;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">
+                OUTCOME</div>
+              <div class="result-outcome" id="result-outcome">—</div>
+            </div>
+            <div class="risk-badge" id="risk-badge">—</div>
+          </div>
+
+          <div class="gauge-wrap">
+            <div class="gauge-label">
+              <span>Probability of Success</span>
+              <span id="prob-label">—</span>
+            </div>
+            <div class="gauge-track">
+              <div class="gauge-fill" id="gauge-fill" style="width:0%"></div>
+            </div>
+            <div class="gauge-pct" id="prob-pct">—</div>
+          </div>
+
+          <div class="advice-box" id="advice-box">
+            <strong>Clinical Guidance</strong>
+            <span id="advice-text">—</span>
+          </div>
+
+          <div class="factors-title">Top Contributing Factors</div>
+          <div id="factors-list"></div>
+        </div>
+      </div>
+
+      <!-- Prediction History -->
+      <div class="history-section">
+        <div class="section-label" style="margin-top:0;">
+          Prediction History
+          <button class="btn-clear-hist" onclick="clearHistory()" style="margin-left:8px;">Clear</button>
+          <button class="btn-clear-hist" onclick="exportHistory()"
+            style="margin-left:8px; border-color: var(--accent); color: var(--accent);">Export to Excel</button>
+        </div>
+        <div id="history-list">
+          <div class="history-empty" id="history-empty">No predictions yet this session.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="footer-note" style="margin-top:40px;">
+      AmbuPredict · NeuO In-Spire · For clinical decision support only — not a replacement for clinical judgment
+    </div>
+  </div>
+
+  <script>
+
+    function switchTab(tab) {
+      document.getElementById('nav-home').classList.remove('active');
+      document.getElementById('nav-predictor').classList.remove('active');
+      document.getElementById('nav-add').classList.remove('active');
+      document.getElementById('home-section').style.display = 'none';
+      document.getElementById('predictor-section').style.display = 'none';
+      document.getElementById('outcome-card').style.display = 'none';
+      document.getElementById('predict-btn').style.display = 'none';
+      document.getElementById('add-btn').style.display = 'none';
+      document.getElementById('result-panel').style.display = 'none';
+      document.getElementById('add-patient-banner').style.display = 'none';
+
+      if (tab === 'home') {
+        document.getElementById('nav-home').classList.add('active');
+        document.getElementById('home-section').style.display = 'block';
+      } else if (tab === 'predictor') {
+        document.getElementById('nav-predictor').classList.add('active');
+        document.getElementById('predictor-section').style.display = 'block';
+        document.getElementById('predict-btn').style.display = 'block';
+        document.getElementById('spo2-trajectory-grid').style.display = 'none';
+        document.getElementById('spo2-chart-card').style.display = 'none';
+        document.getElementById('spo2-chart-label').style.display = 'none';
+        document.getElementById('spo2-section-label').textContent = 'SpO₂ at Admission';
+      } else if (tab === 'add') {
+        document.getElementById('nav-add').classList.add('active');
+        document.getElementById('predictor-section').style.display = 'block';
+        document.getElementById('outcome-card').style.display = 'block';
+        document.getElementById('add-btn').style.display = 'block';
+        document.getElementById('add-patient-banner').style.display = 'flex';
+        document.getElementById('spo2-trajectory-grid').style.display = 'grid';
+        document.getElementById('spo2-chart-card').style.display = 'block';
+        document.getElementById('spo2-chart-label').style.display = 'flex';
+        document.getElementById('spo2-section-label').textContent = 'SpO₂ Readings Post-Intubation';
+      }
+    }
+
+    const API = 'https://ambu-predict-production.up.railway.app';
+    let apiOnline = false;
+    let predHistory = [];
+    let histCount = 0;
+    let spo2Chart = null;
+
+    // ── API status check ────────────────────────────────────────────────────────
+    async function checkStatus() {
+      try {
+        const r = await fetch(`${API}/`, { signal: AbortSignal.timeout(3000) });
+        if (r.ok) {
+          apiOnline = true;
+          document.getElementById('status-dot').classList.add('ok');
+          document.getElementById('status-text').textContent = 'API Connected';
+          document.getElementById('demo-banner').style.display = 'none';
+        }
+      } catch {
+        apiOnline = false;
+        document.getElementById('status-text').textContent = 'API Offline — Demo Mode';
+        document.getElementById('demo-banner').style.display = 'flex';
+      }
+    }
+    checkStatus();
+
+    // ── SpO2 live chart ─────────────────────────────────────────────────────────
+    function initChart() {
+      const ctx = document.getElementById('spo2-chart').getContext('2d');
+      spo2Chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['Before', '5 min', '10 min', '15 min', '20 min', '25 min', '30 min'],
+          datasets: [{
+            label: 'SpO₂ %',
+            data: getSpO2Values(),
+            borderColor: '#00d4aa',
+            backgroundColor: 'rgba(0,212,170,0.08)',
+            borderWidth: 2.5,
+            pointBackgroundColor: '#00d4aa',
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            fill: true,
+            tension: 0.4,
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ` SpO₂: ${ctx.parsed.y}%`
+              }
+            }
+          },
+          scales: {
+            y: {
+              min: 50, max: 100,
+              grid: { color: 'rgba(255,255,255,0.05)' },
+              ticks: {
+                color: '#6b7fa3',
+                font: { family: 'DM Mono', size: 11 },
+                callback: v => v + '%'
+              }
+            },
+            x: {
+              grid: { color: 'rgba(255,255,255,0.05)' },
+              ticks: { color: '#6b7fa3', font: { family: 'DM Mono', size: 11 } }
+            }
+          },
+          animation: { duration: 300 }
+        }
+      });
+    }
+
+    function getSpO2Values() {
+      return [
+        parseInt(document.getElementById('spo2_0').value) || 0,
+        parseInt(document.getElementById('spo2_5').value) || 0,
+        parseInt(document.getElementById('spo2_10').value) || 0,
+        parseInt(document.getElementById('spo2_15').value) || 0,
+        parseInt(document.getElementById('spo2_20').value) || 0,
+        parseInt(document.getElementById('spo2_25').value) || 0,
+        parseInt(document.getElementById('spo2_30').value) || 0,
+      ];
+    }
+
+    function updateChart() {
+      if (!spo2Chart) return;
+      const vals = getSpO2Values();
+      spo2Chart.data.datasets[0].data = vals;
+      // Color based on trend
+      const rising = vals[6] > vals[0] + 5;
+      const color = rising ? '#00d4aa' : vals[6] < vals[0] ? '#ef4444' : '#f59e0b';
+      spo2Chart.data.datasets[0].borderColor = color;
+      spo2Chart.data.datasets[0].pointBackgroundColor = color;
+      spo2Chart.data.datasets[0].backgroundColor = color.replace(')', ',0.08)').replace('rgb', 'rgba');
+      spo2Chart.update('none');
+    }
+
+    // Attach live chart update to all SpO2 inputs
+    ['spo2_0', 'spo2_5', 'spo2_10', 'spo2_15', 'spo2_20', 'spo2_25', 'spo2_30'].forEach(id => {
+      document.getElementById(id).addEventListener('input', updateChart);
+    });
+
+    // Init chart on page load
+    window.addEventListener('load', initChart);
+
+    // ── Collect form values ────────────────────────────────────────────────────
+    function getFormData() {
+      return {
+        bpm: parseInt(document.getElementById('bpm').value),
+        mode: document.getElementById('mode').value,
+        peep: parseInt(document.getElementById('peep').value),
+        lpm: parseFloat(document.getElementById('lpm').value),
+        age: parseInt(document.getElementById('age').value),
+        gender: document.getElementById('gender').value,
+        condition: document.getElementById('condition').value,
+        comorbidity: document.getElementById('comorbidity').value,
+        pulse: parseInt(document.getElementById('pulse').value),
+        bp_systolic: parseInt(document.getElementById('bp_sys').value),
+        bp_diastolic: parseInt(document.getElementById('bp_dia').value),
+        gcs_score: parseInt(document.getElementById('gcs').value),
+        cvs_score: parseInt(document.getElementById('cvs').value),
+        spo2_before: parseInt(document.getElementById('spo2_0').value),
+        spo2_5min: parseInt(document.getElementById('spo2_5').value),
+        spo2_10min: parseInt(document.getElementById('spo2_10').value),
+        spo2_15min: parseInt(document.getElementById('spo2_15').value),
+        spo2_20min: parseInt(document.getElementById('spo2_20').value),
+        spo2_25min: parseInt(document.getElementById('spo2_25').value),
+        spo2_30min: parseInt(document.getElementById('spo2_30').value),
+      };
+    }
+
+    // ── Demo mode: simulate a realistic prediction locally ────────────────────
+    function simulatePrediction(data) {
+      const spo2Delta = data.spo2_30min - data.spo2_before;
+      const gcsGood = data.gcs_score > 8;
+      const bpmOk = data.bpm >= 20;
+      const modeHigh = ['High', 'Assist Control'].includes(data.mode);
+      const ageOk = data.age < 70;
+
+      let score = 0;
+      if (data.spo2_30min > 90) score += 35;
+      else if (data.spo2_30min > 80) score += 20;
+      else score += 5;
+      if (gcsGood) score += 20;
+      if (bpmOk) score += 10;
+      if (modeHigh) score += 10;
+      if (ageOk) score += 10;
+      if (data.bp_systolic > 90) score += 10;
+      score = Math.min(98, Math.max(5, score + (Math.random() * 6 - 3)));
+
+      const prob = score / 100;
+      return {
+        probability: parseFloat(prob.toFixed(4)),
+        probability_pct: parseFloat(score.toFixed(1)),
+        outcome: prob >= 0.5 ? 'Positive' : 'Negative',
+        risk_level: prob >= 0.70 ? 'HIGH' : prob >= 0.45 ? 'MODERATE' : 'LOW',
+        clinical_advice: prob >= 0.70
+          ? 'High probability of effective ventilation. Proceed with current settings. Monitor SpO₂ every 5 min.'
+          : prob >= 0.45
+            ? 'Moderate probability. Monitor closely. If SpO₂ not improving by 15 min, adjust BPM or Mode upward.'
+            : 'Low probability of success. Consider increasing BPM/Mode, adjusting PEEP, or escalating to full ventilator.',
+        top_factors: [
+          { feature: 'spo2_30min', importance: 0.166 },
+          { feature: 'spo2_20min', importance: 0.127 },
+          { feature: 'spo2_25min', importance: 0.108 },
+          { feature: 'spo2_at_15', importance: 0.070 },
+          { feature: 'gcs_score', importance: 0.069 },
+        ]
+      };
+    }
+
+
+    function exportHistory() {
+      if (predHistory.length === 0) {
+        alert('No predictions to export!');
+        return;
+      }
+      const headers = ['Time', 'Age', 'Gender', 'Condition', 'BPM', 'Mode', 'SpO2_Before', 'SpO2_30min', 'Probability', 'Risk_Level', 'Outcome'];
+      let csv = headers.join(',') + '\n';
+      predHistory.forEach(item => {
+        const d = item.formData;
+        const row = [
+          item.time, d.age, d.gender, d.condition, d.bpm, d.mode,
+          d.spo2_before, d.spo2_30min,
+          item.data.probability_pct + '%', item.data.risk_level, item.data.outcome
+        ].map(v => '"' + v + '"').join(',');
+        csv += row + '\n';
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.setAttribute('href', url);
+      a.setAttribute('download', 'AmbuPredict_History.csv');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }
+
+
+    async function addPatientAndRetrain() {
+      const btn = document.getElementById('add-btn');
+      const errBox = document.getElementById('error-box');
+      errBox.style.display = 'none';
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>Retraining...';
+
+      const formData = getFormData();
+      formData.outcome = parseInt(document.getElementById('actual-outcome').value);
+
+      try {
+        const resp = await fetch(`${API}/add_patient`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+          signal: AbortSignal.timeout(15000)
+        });
+        if (!resp.ok) {
+          const err = await resp.json();
+          throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
+        const data = await resp.json();
+        alert('✅ ' + data.message);
+        switchTab('predictor');
+      } catch (e) {
+        errBox.style.display = 'block';
+        errBox.textContent = '⚠️  ' + e.message;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Add & Retrain';
+      }
+    }
+
+    // ── Run prediction ─────────────────────────────────────────────────────────
+    async function runPrediction() {
+      const btn = document.getElementById('predict-btn');
+      const errBox = document.getElementById('error-box');
+      errBox.style.display = 'none';
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>Predicting...';
+
+      const formData = getFormData();
+
+      try {
+        let data;
+
+        if (apiOnline) {
+          const resp = await fetch(`${API}/predict`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData),
+            signal: AbortSignal.timeout(8000)
+          });
+          if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.detail || `HTTP ${resp.status}`);
+          }
+          data = await resp.json();
+        } else {
+          // Demo mode — simulate locally
+          await new Promise(r => setTimeout(r, 800)); // realistic delay
+          data = simulatePrediction(formData);
+        }
+
+        showResult(data, formData);
+        addToHistory(data, formData);
+
+      } catch (e) {
+        errBox.style.display = 'block';
+        errBox.textContent = e.message.includes('fetch') || e.name === 'TimeoutError'
+          ? '⚠️  Cannot reach API. Make sure uvicorn is running on port 8000.'
+          : '⚠️  ' + e.message;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Run Prediction';
+      }
+    }
+
+    // ── Render result ──────────────────────────────────────────────────────────
+    function showResult(data, formData) {
+      const panel = document.getElementById('result-panel');
+      const card = document.getElementById('result-card');
+      const outcome = document.getElementById('result-outcome');
+      const badge = document.getElementById('risk-badge');
+      const gauge = document.getElementById('gauge-fill');
+      const pct = document.getElementById('prob-pct');
+      const probLbl = document.getElementById('prob-label');
+      const advice = document.getElementById('advice-text');
+      const factors = document.getElementById('factors-list');
+
+      const isPositive = data.outcome === 'Positive';
+      outcome.textContent = isPositive ? 'Positive ✓' : 'Negative ✗';
+      outcome.className = 'result-outcome ' + (isPositive ? 'positive' : 'negative');
+
+      card.className = 'result-card ' +
+        (data.risk_level === 'HIGH' ? '' : data.risk_level === 'MODERATE' ? 'moderate' : 'negative');
+
+      badge.textContent = data.risk_level;
+      badge.className = 'risk-badge ' + data.risk_level;
+
+      const pctVal = data.probability_pct;
+      probLbl.textContent = pctVal.toFixed(1) + '%';
+      pct.textContent = pctVal.toFixed(1) + '%';
+      gauge.className = 'gauge-fill ' +
+        (pctVal >= 70 ? '' : pctVal >= 45 ? 'mod-risk' : 'low-risk');
+      gauge.style.width = '0%';
+      setTimeout(() => gauge.style.width = pctVal + '%', 50);
+
+      advice.textContent = data.clinical_advice;
+
+      const maxImp = data.top_factors[0].importance;
+      factors.innerHTML = data.top_factors.map(f => `
+    <div class="factor-row">
+      <div class="factor-name">${formatFeature(f.feature)}</div>
+      <div class="factor-bar-wrap">
+        <div class="factor-bar" style="width:${(f.importance / maxImp * 100).toFixed(1)}%"></div>
+      </div>
+      <div class="factor-val">${(f.importance * 100).toFixed(1)}%</div>
+    </div>`).join('');
+
+      panel.style.display = 'block';
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // ── History ────────────────────────────────────────────────────────────────
+    function addToHistory(data, formData) {
+      histCount++;
+      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const item = { id: histCount, data, formData, time: now };
+      predHistory.unshift(item);
+
+      document.getElementById('history-empty').style.display = 'none';
+      const list = document.getElementById('history-list');
+
+      const row = document.createElement('div');
+      row.className = 'history-row';
+      row.innerHTML = `
+    <div class="hist-num">#${histCount}</div>
+    <div class="hist-patient">
+      ${formData.age}yr ${formData.gender} · ${formData.condition}
+      <span>BPM ${formData.bpm} · ${formData.mode} mode · SpO₂ ${formData.spo2_before}→${formData.spo2_30min}%</span>
+    </div>
+    <div class="hist-prob ${data.outcome.toLowerCase()}">${data.probability_pct.toFixed(0)}%</div>
+    <div class="hist-badge ${data.risk_level}">${data.risk_level}</div>
+    <div class="hist-time">${now}</div>
+  `;
+      row.onclick = () => showResult(data, formData);
+
+      // Insert after the empty message div
+      const empty = document.getElementById('history-empty');
+      list.insertBefore(row, empty.nextSibling);
+    }
+
+    function clearHistory() {
+      predHistory = [];
+      histCount = 0;
+      const list = document.getElementById('history-list');
+      // Remove all rows except the empty message
+      Array.from(list.children).forEach(c => {
+        if (c.id !== 'history-empty') c.remove();
+      });
+      document.getElementById('history-empty').style.display = 'block';
+    }
+
+    // ── Reset form ────────────────────────────────────────────────────────────
+    function resetForm() {
+      document.getElementById('bpm').value = '25';
+      document.getElementById('mode').value = 'High';
+      document.getElementById('peep').value = '10';
+      document.getElementById('lpm').value = '8';
+      document.getElementById('age').value = '45';
+      document.getElementById('gender').value = 'Male';
+      document.getElementById('condition').value = 'Respiratory Failure';
+      document.getElementById('comorbidity').value = 'None';
+      document.getElementById('pulse').value = '95';
+      document.getElementById('bp_sys').value = '120';
+      document.getElementById('bp_dia').value = '80';
+      document.getElementById('gcs').value = '12';
+      document.getElementById('cvs').value = '3';
+      document.getElementById('spo2_0').value = '72';
+      document.getElementById('spo2_5').value = '76';
+      document.getElementById('spo2_10').value = '80';
+      document.getElementById('spo2_15').value = '84';
+      document.getElementById('spo2_20').value = '87';
+      document.getElementById('spo2_25').value = '90';
+      document.getElementById('spo2_30').value = '93';
+      updateChart();
+      document.getElementById('result-panel').style.display = 'none';
+      document.getElementById('error-box').style.display = 'none';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ── Format feature names ──────────────────────────────────────────────────
+    function formatFeature(name) {
+      const map = {
+        spo2_30min: 'SpO₂ @ 30 min', spo2_20min: 'SpO₂ @ 20 min',
+        spo2_25min: 'SpO₂ @ 25 min', spo2_at_15: 'SpO₂ @ 15 min',
+        gcs_score: 'GCS Score', spo2_15min: 'SpO₂ @ 15 min',
+        spo2_5min: 'SpO₂ @ 5 min', spo2_10min: 'SpO₂ @ 10 min',
+        spo2_before: 'SpO₂ Before', spo2_delta: 'SpO₂ Delta',
+        spo2_slope: 'SpO₂ Slope', bp_diastolic: 'BP Diastolic',
+        bp_systolic: 'BP Systolic', age: 'Age', bpm: 'BPM',
+        mode: 'Vent. Mode', peep: 'PEEP', lpm: 'LPM (O₂)',
+        gcs_flag: 'GCS Flag', age_flag: 'Age Flag',
+        bp_pulse_ratio: 'BP/Pulse Ratio',
+      };
+      return map[name] || name;
+    }
+
+    function fillDemoData() {
+      document.getElementById('bpm').value = '30';
+      document.getElementById('mode').value = 'Assist Control';
+      document.getElementById('peep').value = '15';
+      document.getElementById('lpm').value = '12';
+      document.getElementById('age').value = '65';
+      document.getElementById('gender').value = 'Female';
+      document.getElementById('condition').value = 'Cardiac Arrest';
+      document.getElementById('comorbidity').value = 'Hypertension';
+      document.getElementById('pulse').value = '110';
+      document.getElementById('bp_sys').value = '90';
+      document.getElementById('bp_dia').value = '60';
+      document.getElementById('gcs').value = '7';
+      document.getElementById('cvs').value = '4';
+      document.getElementById('spo2_0').value = '65';
+      document.getElementById('spo2_5').value = '68';
+      document.getElementById('spo2_10').value = '72';
+      document.getElementById('spo2_15').value = '77';
+      document.getElementById('spo2_20').value = '81';
+      document.getElementById('spo2_25').value = '85';
+      document.getElementById('spo2_30').value = '88';
+      updateChart();
+    }
+
+    // Enter key shortcut
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !document.getElementById('predict-btn').disabled)
+        runPrediction();
+    });
+  </script>
+</body>
+
+</html>
