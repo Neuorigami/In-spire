@@ -2,6 +2,7 @@
 AmbuPredict — FastAPI Backend
 NeuO In-Spire Resuscitator Automation System
 ML-powered ventilation outcome prediction API
+MongoDB integration for persistent patient data storage
 """
 
 from fastapi import FastAPI, HTTPException
@@ -12,11 +13,16 @@ import numpy as np
 import joblib
 import os
 from fastapi.responses import JSONResponse
+from datetime import datetime
+
+# MongoDB
+from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure
 
 app = FastAPI(
     title       = "AmbuPredict API",
     description = "Predicts ventilation outcome for NeuO In-Spire patients",
-    version     = "1.0.0"
+    version     = "2.0.0"
 )
 
 app.add_middleware(
@@ -24,7 +30,29 @@ app.add_middleware(
     allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
 
-# Load models from models/ subfolder (one level up from ambu_api/)
+# ── MongoDB Connection ────────────────────────────────────────────────────────
+MONGO_URI = os.environ.get("MONGO_URI", "")
+mongo_client = None
+db = None
+patients_col = None
+
+def connect_mongo():
+    global mongo_client, db, patients_col
+    try:
+        mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+        mongo_client.server_info()  # test connection
+        db = mongo_client["ambupredict"]
+        patients_col = db["patients"]
+        print("✅ MongoDB connected successfully")
+    except Exception as e:
+        print(f"⚠️ MongoDB connection failed: {e}")
+        mongo_client = None
+        patients_col = None
+
+if MONGO_URI:
+    connect_mongo()
+
+# ── Load ML Models ────────────────────────────────────────────────────────────
 BASE       = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(BASE, '..', 'models')
 
@@ -117,7 +145,12 @@ def build_features(p: PatientInput) -> pd.DataFrame:
 
 @app.get("/", tags=["Health"])
 def root():
-    return {"status": "ok", "service": "AmbuPredict API v1.0"}
+    mongo_status = "connected" if patients_col is not None else "disconnected"
+    return {
+        "status": "ok",
+        "service": "AmbuPredict API v2.0",
+        "mongodb": mongo_status
+    }
 
 
 @app.get("/meta", tags=["Meta"])
@@ -180,17 +213,9 @@ def batch_predict(patients: list[PatientInput]):
 
 @app.post("/add_patient", tags=["Data"])
 def add_patient(patient: PatientAddInput):
-    """Add a new patient and trigger model retraining."""
-    data_path = os.path.join(BASE, '..', 'data', 'ambu_patient_data.csv')
-    try:
-        df = pd.read_csv(data_path)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Dataset not found.")
-    
-    new_id = f"P{str(len(df)+1).zfill(4)}"
-    
+    """Add a new patient to MongoDB and trigger model retraining."""
+
     new_row = {
-        'patient_id': new_id,
         'age': patient.age, 'gender': patient.gender,
         'condition': patient.condition, 'comorbidity': patient.comorbidity,
         'bpm': patient.bpm, 'mode': patient.mode,
@@ -202,25 +227,90 @@ def add_patient(patient: PatientAddInput):
         'spo2_5min': patient.spo2_5min, 'spo2_10min': patient.spo2_10min,
         'spo2_15min': patient.spo2_15min, 'spo2_20min': patient.spo2_20min,
         'spo2_25min': patient.spo2_25min, 'spo2_30min': patient.spo2_30min,
-        'outcome': patient.outcome
+        'outcome': patient.outcome,
+        'added_at': datetime.utcnow().isoformat()
     }
-    
-    # Append and save
-    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-    df.to_csv(data_path, index=False)
-    
-    # Trigger retraining
+
+    # ── Save to MongoDB ───────────────────────────────────────────────────────
+    mongo_saved = False
+    if patients_col is not None:
+        try:
+            patients_col.insert_one(new_row)
+            mongo_saved = True
+            print(f"✅ Patient saved to MongoDB")
+        except Exception as e:
+            print(f"⚠️ MongoDB save failed: {e}")
+
+    # ── Also save to CSV as backup ────────────────────────────────────────────
+    data_path = os.path.join(BASE, '..', 'data', 'ambu_patient_data.csv')
     try:
-        from .retrain import run_retraining  # ✅ FIXED: relative import
-        run_retraining()
-        
-        # Reload models into memory globally
+        df = pd.read_csv(data_path)
+        new_row_csv = {k: v for k, v in new_row.items() if k != 'added_at'}
+        new_row_csv['patient_id'] = f"P{str(len(df)+1).zfill(4)}"
+        df = pd.concat([df, pd.DataFrame([new_row_csv])], ignore_index=True)
+        df.to_csv(data_path, index=False)
+    except Exception as e:
+        print(f"⚠️ CSV save failed: {e}")
+
+    # ── Retrain using MongoDB data + original CSV ─────────────────────────────
+    try:
+        # Load original CSV data
+        df_csv = pd.read_csv(data_path)
+
+        # Load MongoDB data if connected
+        if patients_col is not None:
+            mongo_records = list(patients_col.find({}, {'_id': 0, 'added_at': 0}))
+            if mongo_records:
+                df_mongo = pd.DataFrame(mongo_records)
+                # Combine CSV + MongoDB data
+                df_all = pd.concat([df_csv, df_mongo], ignore_index=True)
+                df_all = df_all.drop_duplicates()
+            else:
+                df_all = df_csv
+        else:
+            df_all = df_csv
+
+        # Retrain model
+        from .retrain import run_retraining_with_data
+        run_retraining_with_data(df_all)
+
+        # Reload models into memory
         global model, scaler, encoders, feature_cols
         model        = joblib.load(os.path.join(MODELS_DIR, "ambu_rf_model.pkl"))
         scaler       = joblib.load(os.path.join(MODELS_DIR, "ambu_scaler.pkl"))
         encoders     = joblib.load(os.path.join(MODELS_DIR, "ambu_encoders.pkl"))
         feature_cols = joblib.load(os.path.join(MODELS_DIR, "ambu_feature_cols.pkl"))
-        
-        return {"status": "success", "message": "Patient added and model retrained successfully."}
+
+        total_patients = len(df_all)
+        return {
+            "status": "success",
+            "message": f"Patient saved {'to MongoDB' if mongo_saved else 'locally'} and model retrained with {total_patients} total patients.",
+            "mongodb_saved": mongo_saved,
+            "total_patients": total_patients
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Retraining failed: {str(e)}")
+
+
+@app.get("/patients/count", tags=["Data"])
+def get_patient_count():
+    """Get total number of patients in MongoDB."""
+    if patients_col is None:
+        return {"mongodb": "disconnected", "count": 0}
+    try:
+        count = patients_col.count_documents({})
+        return {"mongodb": "connected", "count": count}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/patients/all", tags=["Data"])
+def get_all_patients():
+    """Get all patients stored in MongoDB."""
+    if patients_col is None:
+        raise HTTPException(status_code=503, detail="MongoDB not connected.")
+    try:
+        records = list(patients_col.find({}, {'_id': 0}))
+        return {"total": len(records), "patients": records}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

@@ -7,3 +7,4 @@ imbalanced-learn
 joblib
 pydantic
 python-multipart
+pymongo
