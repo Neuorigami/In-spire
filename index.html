@@ -934,6 +934,7 @@
       <div class="nav-item active" onclick="switchTab('home')" id="nav-home">Home</div>
       <div class="nav-item" onclick="switchTab('add')" id="nav-add">Add Patient</div>
       <div class="nav-item" onclick="switchTab('predictor')" id="nav-predictor">Predictor</div>
+      <div class="nav-item" onclick="switchTab('summary')" id="nav-summary">📊 Data Summary</div>
     </div>
 
 
@@ -1322,8 +1323,10 @@
       document.getElementById('nav-home').classList.remove('active');
       document.getElementById('nav-predictor').classList.remove('active');
       document.getElementById('nav-add').classList.remove('active');
+      document.getElementById('nav-summary').classList.remove('active');
       document.getElementById('home-section').style.display = 'none';
       document.getElementById('predictor-section').style.display = 'none';
+      document.getElementById('summary-section').style.display = 'none';
       document.getElementById('outcome-card').style.display = 'none';
       document.getElementById('predict-btn').style.display = 'none';
       document.getElementById('add-btn').style.display = 'none';
@@ -1351,6 +1354,10 @@
         document.getElementById('spo2-chart-card').style.display = 'block';
         document.getElementById('spo2-chart-label').style.display = 'flex';
         document.getElementById('spo2-section-label').textContent = 'SpO₂ Readings Post-Intubation';
+      } else if (tab === 'summary') {
+        document.getElementById('nav-summary').classList.add('active');
+        document.getElementById('summary-section').style.display = 'block';
+        loadSummary();
       }
     }
 
@@ -1788,6 +1795,119 @@
       document.getElementById('spo2_25').value = '85';
       document.getElementById('spo2_30').value = '88';
       updateChart();
+    }
+
+    
+    // ── Data Summary Functions ────────────────────────────────────────────────
+    async function loadSummary() {
+      try {
+        // Load MongoDB patients
+        const resp = await fetch(`${API}/patients/all`);
+        const json = await resp.json();
+        const mongoPatients = json.patients || [];
+
+        // Stats
+        document.getElementById('stat-mongo').textContent = mongoPatients.length;
+
+        const totalPositive = mongoPatients.filter(p => p.outcome === 1).length;
+        const totalNegative = mongoPatients.filter(p => p.outcome === 0).length;
+        const avgAge = mongoPatients.length > 0
+          ? Math.round(mongoPatients.reduce((s,p) => s + p.age, 0) / mongoPatients.length)
+          : '—';
+
+        document.getElementById('stat-positive').textContent = totalPositive;
+        document.getElementById('stat-negative').textContent = totalNegative;
+        document.getElementById('stat-avg-age').textContent = avgAge;
+        document.getElementById('stat-total').textContent = mongoPatients.length + ' (DB)';
+
+        // Condition breakdown
+        const condMap = {};
+        mongoPatients.forEach(p => { condMap[p.condition] = (condMap[p.condition]||0)+1; });
+        const condHtml = Object.entries(condMap).sort((a,b)=>b[1]-a[1]).map(([c,n]) => `
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+            <div style="width:160px; color:var(--text); font-size:14px;">${c}</div>
+            <div style="flex:1; background:rgba(255,255,255,0.05); border-radius:4px; height:20px; overflow:hidden;">
+              <div style="width:${Math.round(n/mongoPatients.length*100)}%; background:linear-gradient(90deg,var(--accent),var(--accent2)); height:100%; border-radius:4px;"></div>
+            </div>
+            <div style="width:30px; color:var(--accent); font-weight:600;">${n}</div>
+          </div>`).join('');
+        document.getElementById('condition-breakdown').innerHTML = condHtml || '<p style="color:var(--muted)">No data yet</p>';
+
+        // Gender breakdown
+        const genMap = {};
+        mongoPatients.forEach(p => { genMap[p.gender] = (genMap[p.gender]||0)+1; });
+        const genHtml = Object.entries(genMap).map(([g,n]) => `
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+            <div style="width:80px; color:var(--text); font-size:14px;">${g}</div>
+            <div style="flex:1; background:rgba(255,255,255,0.05); border-radius:4px; height:20px; overflow:hidden;">
+              <div style="width:${Math.round(n/mongoPatients.length*100)}%; background:linear-gradient(90deg,#a855f7,#ec4899); height:100%; border-radius:4px;"></div>
+            </div>
+            <div style="width:30px; color:#a855f7; font-weight:600;">${n}</div>
+          </div>`).join('');
+        document.getElementById('gender-breakdown').innerHTML = genHtml || '<p style="color:var(--muted)">No data yet</p>';
+
+        // Recent patients table
+        const recent = mongoPatients.slice(-10).reverse();
+        if (recent.length === 0) {
+          document.getElementById('recent-patients').innerHTML = '<p style="color:var(--muted)">No patients added yet via Add Patient tab.</p>';
+        } else {
+          const tableHtml = `
+            <table class="home-table">
+              <thead><tr>
+                <th>Age</th><th>Gender</th><th>Condition</th><th>BPM</th>
+                <th>SpO₂ Before</th><th>SpO₂ 30min</th><th>Outcome</th><th>Added At</th>
+              </tr></thead>
+              <tbody>
+                ${recent.map(p => `<tr>
+                  <td>${p.age}</td>
+                  <td>${p.gender}</td>
+                  <td>${p.condition}</td>
+                  <td>${p.bpm}</td>
+                  <td>${p.spo2_before}%</td>
+                  <td>${p.spo2_30min}%</td>
+                  <td style="color:${p.outcome===1?'#4ade80':'var(--danger)'}; font-weight:600;">
+                    ${p.outcome===1?'✓ Positive':'✗ Negative'}
+                  </td>
+                  <td style="color:var(--muted); font-size:12px;">${p.added_at ? p.added_at.split('T')[0] : '—'}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>`;
+          document.getElementById('recent-patients').innerHTML = tableHtml;
+        }
+
+      } catch(e) {
+        document.getElementById('stat-total').textContent = 'Error';
+        document.getElementById('condition-breakdown').innerHTML = '<p style="color:var(--danger)">Cannot reach API. Make sure backend is online.</p>';
+      }
+    }
+
+    async function downloadAllData() {
+      try {
+        const resp = await fetch(`${API}/patients/all`);
+        if (!resp.ok) throw new Error("API not reachable");
+        const json = await resp.json();
+        if (!json.patients || json.patients.length === 0) {
+          alert("No patient data in MongoDB yet!");
+          return;
+        }
+        const headers = ['age','gender','condition','comorbidity','bpm','mode','peep','lpm',
+          'pulse','bp_systolic','bp_diastolic','gcs_score','cvs_score',
+          'spo2_before','spo2_5min','spo2_10min','spo2_15min',
+          'spo2_20min','spo2_25min','spo2_30min','outcome','added_at'];
+        let csv = headers.join(',') + '\n';
+        json.patients.forEach(p => {
+          csv += headers.map(h => `"${p[h] ?? ''}"`).join(',') + '\n';
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `AmbuPredict_PatientData_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch(e) {
+        alert('Download failed: ' + e.message);
+      }
     }
 
     // Enter key shortcut
