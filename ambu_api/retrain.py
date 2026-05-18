@@ -34,14 +34,20 @@ def _process_and_train(df: pd.DataFrame):
     df = df.dropna(subset=['outcome', 'gender', 'condition', 'mode'])
 
     df_proc = df.copy()
-    if 'patient_id' in df_proc.columns:
-        df_proc.drop(columns=['patient_id'], inplace=True)
-    if '_id' in df_proc.columns:
-        df_proc.drop(columns=['_id'], inplace=True)
-    if 'added_at' in df_proc.columns:
-        df_proc.drop(columns=['added_at'], inplace=True)
-    if 'photo_urls' in df_proc.columns:
-        df_proc.drop(columns=['photo_urls'], inplace=True)
+    # Drop all non-training columns
+    drop_cols = ['patient_id', '_id', 'added_at', 'photo_urls']
+    for col in drop_cols:
+        if col in df_proc.columns:
+            df_proc.drop(columns=[col], inplace=True)
+
+    # Drop any remaining columns with list/object values that aren't needed
+    for col in df_proc.columns:
+        if col not in FEATURE_COLS + ['outcome', 'gender', 'condition', 'comorbidity', 'mode',
+                                       'age', 'bpm', 'peep', 'lpm', 'pulse', 'bp_systolic',
+                                       'bp_diastolic', 'gcs_score', 'cvs_score', 'spo2_before',
+                                       'spo2_5min', 'spo2_10min', 'spo2_15min', 'spo2_20min',
+                                       'spo2_25min', 'spo2_30min']:
+            df_proc.drop(columns=[col], inplace=True)
 
     # Encode categorical columns
     le_gender    = LabelEncoder()
