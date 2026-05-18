@@ -56,8 +56,11 @@ def _process_and_train(df: pd.DataFrame):
     le_mode      = LabelEncoder()
 
     le_gender.fit(["Male", "Female"])
-    le_condition.fit(["Cardiac Arrest", "Drug Overdose", "Post-Surgical",
-                      "Respiratory Failure", "Stroke/CNS", "Trauma"])
+    # Fit condition encoder on all unique values in data
+    all_conditions = list(df_proc['condition'].unique())
+    standard_conditions = ["Cardiac Arrest", "Drug Overdose", "Post-Surgical", "Respiratory Failure", "Stroke/CNS", "Trauma"]
+    all_conditions = list(set(standard_conditions + all_conditions))
+    le_condition.fit(all_conditions)
     le_comorbid.fit(["None", "Hypertension", "Diabetes", "COPD", "Heart Disease"])
     le_mode.fit(["Low", "Medium", "High", "Assist Control"])
 

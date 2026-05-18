@@ -1143,14 +1143,17 @@
           </div>
           <div class="field">
             <label>Condition</label>
-            <select id="condition">
+            <select id="condition" onchange="toggleCustomCondition(this)">
               <option>Cardiac Arrest</option>
               <option>Drug Overdose</option>
               <option>Post-Surgical</option>
               <option selected>Respiratory Failure</option>
               <option>Stroke/CNS</option>
               <option>Trauma</option>
+              <option value="Others">Others (specify)</option>
             </select>
+            <input type="text" id="condition-custom" placeholder="Type condition here..." 
+              style="display:none; margin-top:8px;" />
           </div>
           <div class="field" style="margin-bottom:0;">
             <label>Comorbidity</label>
@@ -1537,6 +1540,12 @@
     // Init chart on page load
     window.addEventListener('load', initChart);
 
+    function toggleCustomCondition(sel) {
+      const custom = document.getElementById('condition-custom');
+      custom.style.display = sel.value === 'Others' ? 'block' : 'none';
+      if (sel.value !== 'Others') custom.value = '';
+    }
+
     // ── Collect form values ────────────────────────────────────────────────────
     function getFormData() {
       return {
@@ -1546,7 +1555,9 @@
         lpm: parseFloat(document.getElementById('lpm').value),
         age: parseInt(document.getElementById('age').value),
         gender: document.getElementById('gender').value,
-        condition: document.getElementById('condition').value,
+        condition: document.getElementById('condition').value === 'Others'
+          ? (document.getElementById('condition-custom').value.trim() || 'Others')
+          : document.getElementById('condition').value,
         comorbidity: document.getElementById('comorbidity').value,
         pulse: parseInt(document.getElementById('pulse').value),
         bp_systolic: parseInt(document.getElementById('bp_sys').value),

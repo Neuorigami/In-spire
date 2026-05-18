@@ -105,7 +105,12 @@ class PatientInput(BaseModel):
         return v
     @validator('condition')
     def condition_valid(cls, v):
-        if v not in VALID_CONDITIONS: raise ValueError(f"Condition must be one of {VALID_CONDITIONS}")
+        # Allow standard conditions OR any custom condition
+        standard = ["Cardiac Arrest", "Drug Overdose", "Post-Surgical",
+                    "Respiratory Failure", "Stroke/CNS", "Trauma"]
+        if v not in standard:
+            # Store as-is for custom conditions
+            return v
         return v
     @validator('comorbidity')
     def comorbidity_valid(cls, v):
