@@ -261,12 +261,13 @@ def add_patient(patient: PatientAddInput):
 
         # Load MongoDB data if connected
         if patients_col is not None:
-            mongo_records = list(patients_col.find({}, {'_id': 0, 'added_at': 0}))
+            mongo_records = list(patients_col.find({}, {'_id': 0, 'added_at': 0, 'photo_urls': 0}))
             if mongo_records:
                 df_mongo = pd.DataFrame(mongo_records)
                 # Combine CSV + MongoDB data
                 df_all = pd.concat([df_csv, df_mongo], ignore_index=True)
-                df_all = df_all.drop_duplicates()
+                # Drop duplicates only on key columns, not all
+                df_all = df_all.drop_duplicates(subset=['age','gender','condition','bpm','spo2_before','spo2_30min','outcome'])
             else:
                 df_all = df_csv
         else:
