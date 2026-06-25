@@ -328,3 +328,124 @@ def get_all_patients():
         return {"total": len(records), "patients": records}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Admin System ──────────────────────────────────────────────────────────────
+import hashlib
+import secrets
+from bson import ObjectId
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_token(token: str) -> bool:
+    if db is None:
+        return False
+    return db["admin_tokens"].find_one({"token": token}) is not None
+
+class LoginInput(BaseModel):
+    username: str
+    password: str
+
+class AddUserInput(BaseModel):
+    username: str
+    password: str
+    role: str = "admin"
+
+
+@app.post("/admin/login", tags=["Admin"])
+def admin_login(data: LoginInput):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    
+    # Check if any admin exists, if not create default
+    if db["admins"].count_documents({}) == 0:
+        db["admins"].insert_one({
+            "username": "admin",
+            "password": hash_password("admin123"),
+            "role": "superadmin"
+        })
+    
+    user = db["admins"].find_one({"username": data.username})
+    if not user or user["password"] != hash_password(data.password):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    
+    token = secrets.token_hex(32)
+    db["admin_tokens"].insert_one({"token": token, "username": data.username})
+    return {"token": token, "username": data.username, "role": user.get("role", "admin")}
+
+
+@app.get("/admin/patients", tags=["Admin"])
+def admin_get_patients(authorization: str = None):
+    from fastapi import Header
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    try:
+        patients = list(db["patients"].find({}))
+        for p in patients:
+            p["_id"] = str(p["_id"])
+        return {"total": len(patients), "patients": patients}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/admin/patient/{patient_id}", tags=["Admin"])
+def admin_delete_patient(patient_id: str):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    try:
+        result = db["patients"].delete_one({"_id": ObjectId(patient_id)})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Patient not found")
+        return {"status": "success", "message": "Patient deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/admin/retrain", tags=["Admin"])
+def admin_retrain():
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    try:
+        import pandas as pd
+        mongo_records = list(db["patients"].find({}, {'_id': 0, 'added_at': 0, 'photo_urls': 0}))
+        if not mongo_records:
+            raise HTTPException(status_code=400, detail="No patient data to retrain with")
+        
+        df_mongo = pd.DataFrame(mongo_records)
+        data_path = os.path.join(BASE, '..', 'data', 'ambu_patient_data.csv')
+        df_csv = pd.read_csv(data_path)
+        
+        REQUIRED = ['age','gender','condition','comorbidity','bpm','mode','peep','lpm',
+                    'pulse','bp_systolic','bp_diastolic','gcs_score','cvs_score',
+                    'spo2_before','spo2_5min','spo2_10min','spo2_15min',
+                    'spo2_20min','spo2_25min','spo2_30min','outcome']
+        df_all = pd.concat([df_csv, df_mongo], ignore_index=True)
+        df_all = df_all[[c for c in REQUIRED if c in df_all.columns]]
+        
+        from .retrain import run_retraining_with_data
+        run_retraining_with_data(df_all)
+        
+        global model, scaler, encoders, feature_cols
+        model        = joblib.load(os.path.join(MODELS_DIR, "ambu_rf_model.pkl"))
+        scaler       = joblib.load(os.path.join(MODELS_DIR, "ambu_scaler.pkl"))
+        encoders     = joblib.load(os.path.join(MODELS_DIR, "ambu_encoders.pkl"))
+        feature_cols = joblib.load(os.path.join(MODELS_DIR, "ambu_feature_cols.pkl"))
+        
+        return {"status": "success", "message": f"Model retrained with {len(df_all)} patients"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/admin/add_user", tags=["Admin"])
+def admin_add_user(data: AddUserInput):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    if db["admins"].find_one({"username": data.username}):
+        raise HTTPException(status_code=400, detail="Username already exists")
+    db["admins"].insert_one({
+        "username": data.username,
+        "password": hash_password(data.password),
+        "role": data.role
+    })
+    return {"status": "success", "message": f"User '{data.username}' added successfully"}

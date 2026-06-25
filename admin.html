@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AmbuPredict — Admin Panel</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --bg:#050505;--surface:rgba(20,25,35,0.6);--surface2:rgba(35,45,60,0.5);
+      --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.15);
+      --text:#f1f5f9;--muted:#94a3b8;--accent:#00f2fe;--accent2:#4facfe;
+      --warn:#fbbf24;--danger:#f87171;
+    }
+    body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;overflow-x:hidden;}
+    body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,242,254,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,242,254,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+    .wrapper{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:24px 20px 60px;}
+
+    /* Login */
+    .login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+    .login-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:40px;width:100%;max-width:420px;backdrop-filter:blur(12px);}
+    .login-card h1{font-family:'Outfit',sans-serif;font-size:28px;font-weight:800;margin-bottom:6px;}
+    .login-card h1 span{color:var(--accent);}
+    .login-card p{color:var(--muted);font-size:14px;margin-bottom:28px;}
+    .field{margin-bottom:18px;}
+    .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;font-weight:500;}
+    .field input{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:12px 14px;font-size:15px;outline:none;transition:all .3s;}
+    .field input:focus{border-color:var(--accent2);box-shadow:0 0 0 4px rgba(79,172,254,0.15);}
+    .btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;font-family:'Outfit',sans-serif;font-weight:700;font-size:16px;border:none;border-radius:12px;cursor:pointer;transition:all .3s;}
+    .btn:hover{opacity:0.9;transform:translateY(-1px);}
+    .btn:disabled{opacity:0.6;cursor:not-allowed;transform:none;}
+    .error{background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3);border-radius:8px;padding:10px 14px;color:var(--danger);font-size:14px;margin-top:12px;display:none;}
+    .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(0,0,0,0.3);border-top-color:#000;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Dashboard */
+    #dashboard{display:none;}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:30px;padding-bottom:20px;border-bottom:1px solid var(--border);}
+    .logo{display:flex;align-items:center;gap:10px;}
+    .logo-icon{width:38px;height:38px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;}
+    .logo-text{font-family:'Outfit',sans-serif;font-weight:800;font-size:20px;}
+    .logo-text span{color:var(--accent);}
+    .admin-badge{background:rgba(248,113,113,0.15);border:1px solid rgba(248,113,113,0.3);color:var(--danger);font-family:'DM Mono',monospace;font-size:12px;padding:4px 12px;border-radius:20px;}
+    .btn-logout{background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'DM Mono',monospace;font-size:13px;padding:6px 14px;border-radius:8px;cursor:pointer;transition:all .2s;}
+    .btn-logout:hover{border-color:var(--danger);color:var(--danger);}
+
+    /* Stats */
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:28px;}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;text-align:center;}
+    .stat-num{font-family:'Outfit',sans-serif;font-size:36px;font-weight:800;}
+    .stat-label{color:var(--muted);font-size:13px;margin-top:4px;}
+
+    /* Action buttons */
+    .action-bar{display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;}
+    .btn-action{padding:10px 20px;border-radius:10px;font-family:'Outfit',sans-serif;font-weight:600;font-size:14px;cursor:pointer;transition:all .2s;border:none;}
+    .btn-action.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;}
+    .btn-action.warn{background:linear-gradient(135deg,var(--warn),#f97316);color:#000;}
+    .btn-action.danger{background:rgba(248,113,113,0.15);border:1px solid rgba(248,113,113,0.3);color:var(--danger);}
+    .btn-action.secondary{background:var(--surface2);border:1px solid var(--border);color:var(--text);}
+    .btn-action:hover{transform:translateY(-1px);opacity:0.9;}
+
+    /* Table */
+    .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:24px;}
+    .table-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+    .table-header h3{font-family:'Outfit',sans-serif;font-size:18px;font-weight:700;}
+    .search-input{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:14px;outline:none;width:220px;}
+    .search-input:focus{border-color:var(--accent2);}
+    table{width:100%;border-collapse:collapse;font-size:14px;}
+    th{background:var(--surface2);padding:12px 16px;text-align:left;color:var(--accent);font-family:'DM Mono',monospace;font-size:12px;letter-spacing:1px;font-weight:500;}
+    td{padding:12px 16px;border-top:1px solid var(--border);vertical-align:middle;}
+    tr:hover td{background:rgba(255,255,255,0.02);}
+    .outcome-badge{padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;}
+    .outcome-badge.pos{background:rgba(74,222,128,0.15);color:#4ade80;}
+    .outcome-badge.neg{background:rgba(248,113,113,0.15);color:var(--danger);}
+    .btn-delete{background:transparent;border:1px solid rgba(248,113,113,0.3);color:var(--danger);padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;transition:all .2s;}
+    .btn-delete:hover{background:rgba(248,113,113,0.1);}
+    .btn-view-photos{background:transparent;border:1px solid rgba(0,242,254,0.3);color:var(--accent);padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;transition:all .2s;margin-right:6px;}
+    .btn-view-photos:hover{background:rgba(0,242,254,0.1);}
+    .empty{text-align:center;color:var(--muted);padding:40px;font-family:'DM Mono',monospace;}
+
+    /* Photo modal */
+    .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+    .modal.active{display:flex;}
+    .modal-card{background:#0a0f1a;border:1px solid var(--border2);border-radius:16px;padding:28px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;}
+    .modal-card h3{font-family:'Outfit',sans-serif;font-size:20px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;}
+    .modal-close{background:transparent;border:none;color:var(--muted);font-size:22px;cursor:pointer;}
+    .photos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;}
+    .photo-item{border-radius:10px;overflow:hidden;border:1px solid var(--border);aspect-ratio:1;}
+    .photo-item img{width:100%;height:100%;object-fit:cover;cursor:pointer;transition:transform .2s;}
+    .photo-item img:hover{transform:scale(1.05);}
+    .no-photos{color:var(--muted);font-size:14px;text-align:center;padding:20px;}
+
+    /* Toast */
+    .toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:12px 20px;font-size:14px;z-index:2000;transform:translateY(100px);opacity:0;transition:all .3s;}
+    .toast.show{transform:translateY(0);opacity:1;}
+    .toast.success{border-color:rgba(74,222,128,0.4);color:#4ade80;}
+    .toast.error{border-color:rgba(248,113,113,0.4);color:var(--danger);}
+
+    /* Add Admin */
+    .section-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:24px;}
+    .section-card h3{font-family:'Outfit',sans-serif;font-size:18px;font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border);}
+    .inline-form{display:flex;gap:10px;flex-wrap:wrap;}
+    .inline-form input{flex:1;min-width:150px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 12px;font-size:14px;outline:none;}
+    .inline-form input:focus{border-color:var(--accent2);}
+
+    @media(max-width:600px){
+      .stats-grid{grid-template-columns:repeat(2,1fr);}
+      .action-bar{flex-direction:column;}
+      .table-header{flex-direction:column;gap:10px;align-items:flex-start;}
+      .search-input{width:100%;}
+      th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5){display:none;}
+    }
+  </style>
+</head>
+<body>
+
+<!-- Login -->
+<div class="login-wrap" id="login-wrap">
+  <div class="login-card">
+    <h1>Ambu<span>Predict</span></h1>
+    <p>🔐 Admin Panel — Authorized Access Only</p>
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="login-user" placeholder="Enter username" autocomplete="username"/>
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="login-pass" placeholder="Enter password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <button class="btn" id="login-btn" onclick="doLogin()">Login to Admin</button>
+    <div class="error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard">
+<div class="wrapper">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🫁</div>
+      <div>
+        <div class="logo-text">Ambu<span>Predict</span></div>
+        <div style="font-size:12px;color:var(--muted);">Admin Panel</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="admin-badge">⚡ ADMIN</div>
+      <span style="color:var(--muted);font-size:13px;" id="admin-name"></span>
+      <button class="btn-logout" onclick="doLogout()">Logout</button>
+    </div>
+  </header>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-num" style="color:var(--accent);" id="s-total">—</div>
+      <div class="stat-label">Total Patients</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" style="color:#4ade80;" id="s-positive">—</div>
+      <div class="stat-label">Positive Outcomes</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" style="color:var(--danger);" id="s-negative">—</div>
+      <div class="stat-label">Negative Outcomes</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" style="color:var(--warn);" id="s-photos">—</div>
+      <div class="stat-label">Patients with Photos</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" style="color:var(--accent2);" id="s-rate">—</div>
+      <div class="stat-label">Success Rate</div>
+    </div>
+  </div>
+
+  <!-- Action Bar -->
+  <div class="action-bar">
+    <button class="btn-action primary" onclick="downloadCSV()">⬇ Download CSV</button>
+    <button class="btn-action warn" onclick="triggerRetrain()">🔄 Manual Retrain</button>
+    <button class="btn-action secondary" onclick="loadPatients()">🔃 Refresh</button>
+  </div>
+
+  <!-- Patients Table -->
+  <div class="table-wrap">
+    <div class="table-header">
+      <h3>All Patients</h3>
+      <input class="search-input" type="text" placeholder="🔍 Search patients..." oninput="filterPatients(this.value)"/>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Age / Gender</th>
+            <th>Condition</th>
+            <th>BPM</th>
+            <th>SpO₂ Before→30min</th>
+            <th>Outcome</th>
+            <th>Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="patients-tbody">
+          <tr><td colspan="8" class="empty">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Add Admin User -->
+  <div class="section-card">
+    <h3>➕ Add Admin User</h3>
+    <div class="inline-form">
+      <input type="text" id="new-user" placeholder="Username"/>
+      <input type="password" id="new-pass" placeholder="Password"/>
+      <input type="text" id="new-role" placeholder="Role (e.g. doctor)" value="admin"/>
+      <button class="btn-action primary" onclick="addAdmin()">Add User</button>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- Photo Modal -->
+<div class="modal" id="photo-modal">
+  <div class="modal-card">
+    <h3>
+      Patient Photos
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </h3>
+    <div class="photos-grid" id="modal-photos"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'https://ambu-predict.onrender.com';
+let token = localStorage.getItem('admin_token');
+let allPatients = [];
+
+// ── Auth ──────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-error');
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value.trim();
+  if (!user || !pass) { showError('Please enter username and password'); return; }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Logging in...';
+  err.style.display = 'none';
+  try {
+    const resp = await fetch(`${API}/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: user, password: pass }),
+      signal: AbortSignal.timeout(10000)
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || 'Invalid credentials');
+    token = data.token;
+    localStorage.setItem('admin_token', token);
+    localStorage.setItem('admin_user', data.username);
+    showDashboard(data.username);
+  } catch(e) {
+    showError(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Login to Admin';
+  }
+}
+
+function showError(msg) {
+  const err = document.getElementById('login-error');
+  err.textContent = '⚠️ ' + msg;
+  err.style.display = 'block';
+}
+
+function doLogout() {
+  localStorage.removeItem('admin_token');
+  localStorage.removeItem('admin_user');
+  token = null;
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('login-wrap').style.display = 'flex';
+}
+
+function showDashboard(username) {
+  document.getElementById('login-wrap').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('admin-name').textContent = '👤 ' + username;
+  loadPatients();
+}
+
+// ── Load Patients ─────────────────────────────────────────────────────────
+async function loadPatients() {
+  try {
+    const resp = await fetch(`${API}/admin/patients`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+      signal: AbortSignal.timeout(10000)
+    });
+    if (resp.status === 401) { doLogout(); return; }
+    const json = await resp.json();
+    allPatients = json.patients || [];
+    renderStats(allPatients);
+    renderTable(allPatients);
+  } catch(e) {
+    showToast('Failed to load patients: ' + e.message, 'error');
+  }
+}
+
+function renderStats(pts) {
+  const pos = pts.filter(p => p.outcome === 1).length;
+  const neg = pts.filter(p => p.outcome === 0).length;
+  const withPhotos = pts.filter(p => p.photo_urls && p.photo_urls.length > 0).length;
+  document.getElementById('s-total').textContent = pts.length;
+  document.getElementById('s-positive').textContent = pos;
+  document.getElementById('s-negative').textContent = neg;
+  document.getElementById('s-photos').textContent = withPhotos;
+  document.getElementById('s-rate').textContent = pts.length ? Math.round(pos/pts.length*100) + '%' : '—';
+}
+
+function renderTable(pts) {
+  const tbody = document.getElementById('patients-tbody');
+  if (!pts.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">No patients found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = pts.map((p, i) => `
+    <tr>
+      <td style="color:var(--muted);font-family:'DM Mono',monospace;">${i+1}</td>
+      <td><strong>${p.age}yr</strong> <span style="color:var(--muted);">${p.gender}</span></td>
+      <td>${p.condition}</td>
+      <td style="font-family:'DM Mono',monospace;">${p.bpm}</td>
+      <td style="font-family:'DM Mono',monospace;">${p.spo2_before}% → ${p.spo2_30min}%</td>
+      <td><span class="outcome-badge ${p.outcome===1?'pos':'neg'}">${p.outcome===1?'✓ Positive':'✗ Negative'}</span></td>
+      <td style="color:var(--muted);font-size:12px;">${p.added_at ? p.added_at.split('T')[0] : '—'}</td>
+      <td>
+        ${p.photo_urls && p.photo_urls.length ? `<button class="btn-view-photos" onclick='viewPhotos(${JSON.stringify(p.photo_urls)})'>📷 ${p.photo_urls.length}</button>` : ''}
+        <button class="btn-delete" onclick="deletePatient('${p._id}')">🗑 Delete</button>
+      </td>
+    </tr>`).join('');
+}
+
+function filterPatients(query) {
+  const q = query.toLowerCase();
+  const filtered = allPatients.filter(p =>
+    p.condition.toLowerCase().includes(q) ||
+    p.gender.toLowerCase().includes(q) ||
+    String(p.age).includes(q) ||
+    (p.added_at && p.added_at.includes(q))
+  );
+  renderTable(filtered);
+}
+
+// ── Delete Patient ────────────────────────────────────────────────────────
+async function deletePatient(id) {
+  if (!confirm('Delete this patient record permanently?')) return;
+  try {
+    const resp = await fetch(`${API}/admin/patient/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!resp.ok) throw new Error('Delete failed');
+    showToast('Patient deleted successfully', 'success');
+    loadPatients();
+  } catch(e) {
+    showToast('Delete failed: ' + e.message, 'error');
+  }
+}
+
+// ── Manual Retrain ────────────────────────────────────────────────────────
+async function triggerRetrain() {
+  if (!confirm('Trigger model retraining with all current data?')) return;
+  showToast('Retraining started... this may take 30-60 seconds', 'success');
+  try {
+    const resp = await fetch(`${API}/admin/retrain`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      signal: AbortSignal.timeout(90000)
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail);
+    showToast('✅ ' + data.message, 'success');
+  } catch(e) {
+    showToast('Retrain failed: ' + e.message, 'error');
+  }
+}
+
+// ── Download CSV ──────────────────────────────────────────────────────────
+function downloadCSV() {
+  if (!allPatients.length) { showToast('No data to download', 'error'); return; }
+  const headers = ['age','gender','condition','comorbidity','bpm','mode','peep','lpm',
+    'pulse','bp_systolic','bp_diastolic','gcs_score','cvs_score',
+    'spo2_before','spo2_5min','spo2_10min','spo2_15min','spo2_20min','spo2_25min','spo2_30min','outcome','added_at'];
+  let csv = headers.join(',') + '\n';
+  allPatients.forEach(p => { csv += headers.map(h => `"${p[h]??''}"`).join(',') + '\n'; });
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `AmbuPredict_Admin_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  showToast('CSV downloaded!', 'success');
+}
+
+// ── Add Admin User ────────────────────────────────────────────────────────
+async function addAdmin() {
+  const user = document.getElementById('new-user').value.trim();
+  const pass = document.getElementById('new-pass').value.trim();
+  const role = document.getElementById('new-role').value.trim();
+  if (!user || !pass) { showToast('Username and password required', 'error'); return; }
+  try {
+    const resp = await fetch(`${API}/admin/add_user`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ username: user, password: pass, role: role || 'admin' })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail);
+    showToast('✅ User added: ' + user, 'success');
+    document.getElementById('new-user').value = '';
+    document.getElementById('new-pass').value = '';
+  } catch(e) {
+    showToast('Failed: ' + e.message, 'error');
+  }
+}
+
+// ── Photo Modal ───────────────────────────────────────────────────────────
+function viewPhotos(urls) {
+  const grid = document.getElementById('modal-photos');
+  if (!urls || !urls.length) {
+    grid.innerHTML = '<div class="no-photos">No photos for this patient</div>';
+  } else {
+    grid.innerHTML = urls.map(url => `
+      <div class="photo-item">
+        <img src="${url}" alt="Patient photo" onclick="window.open('${url}','_blank')"/>
+      </div>`).join('');
+  }
+  document.getElementById('photo-modal').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('photo-modal').classList.remove('active');
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+if (token) {
+  const savedUser = localStorage.getItem('admin_user') || 'Admin';
+  showDashboard(savedUser);
+}
+</script>
+</body>
+</html>
