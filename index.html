@@ -969,7 +969,6 @@
       <div class="nav-item active" onclick="switchTab('home')" id="nav-home">Home</div>
       <div class="nav-item" onclick="switchTab('add')" id="nav-add">Add Patient</div>
       <div class="nav-item" onclick="switchTab('predictor')" id="nav-predictor">Predictor</div>
-      <div class="nav-item" onclick="switchTab('summary')" id="nav-summary">📊 Data Summary</div>
       <div class="nav-item" onclick="window.open('admin.html','_blank')" id="nav-admin" style="margin-left:auto;color:var(--danger);border:1px solid rgba(248,113,113,0.3);border-radius:8px;">⚡ Admin</div>
     </div>
 
@@ -1606,6 +1605,40 @@
     }
 
     // ── Collect form values ────────────────────────────────────────────────────
+    function validateForm() {
+      const age = parseInt(document.getElementById('age').value);
+      const lpm = parseFloat(document.getElementById('lpm').value);
+      const pulse = parseInt(document.getElementById('pulse').value);
+      const bp_sys = parseInt(document.getElementById('bp_sys').value);
+      const bp_dia = parseInt(document.getElementById('bp_dia').value);
+      const gcs = parseInt(document.getElementById('gcs').value);
+      const cvs = parseInt(document.getElementById('cvs').value);
+      const spo2_0 = parseInt(document.getElementById('spo2_0').value);
+      const spo2_30 = parseInt(document.getElementById('spo2_30').value);
+      const condition = document.getElementById('condition').value;
+      const customCondition = document.getElementById('condition-custom').value.trim();
+
+      if (!age || age < 1 || age > 120) { showValidationError('Age must be between 1 and 120'); return false; }
+      if (!lpm || lpm < 0.5 || lpm > 20) { showValidationError('O₂ Flow Rate must be between 0.5 and 20 LPM'); return false; }
+      if (!pulse || pulse < 20 || pulse > 250) { showValidationError('Pulse must be between 20 and 250 bpm'); return false; }
+      if (!bp_sys || bp_sys < 60 || bp_sys > 250) { showValidationError('BP Systolic must be between 60 and 250'); return false; }
+      if (!bp_dia || bp_dia < 30 || bp_dia > 150) { showValidationError('BP Diastolic must be between 30 and 150'); return false; }
+      if (bp_dia >= bp_sys) { showValidationError('BP Diastolic must be less than BP Systolic'); return false; }
+      if (!gcs || gcs < 3 || gcs > 15) { showValidationError('GCS Score must be between 3 and 15'); return false; }
+      if (!cvs || cvs < 1 || cvs > 5) { showValidationError('CVS Score must be between 1 and 5'); return false; }
+      if (!spo2_0 || spo2_0 < 30 || spo2_0 > 100) { showValidationError('SpO₂ before must be between 30 and 100'); return false; }
+      if (!spo2_30 || spo2_30 < 30 || spo2_30 > 100) { showValidationError('SpO₂ at 30 min must be between 30 and 100'); return false; }
+      if (condition === 'Others' && !customCondition) { showValidationError('Please specify the condition in the text field'); return false; }
+      return true;
+    }
+
+    function showValidationError(msg) {
+      const errBox = document.getElementById('error-box');
+      errBox.style.display = 'block';
+      errBox.textContent = '⚠️ ' + msg;
+      errBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
     function getFormData() {
       return {
         bpm: parseInt(document.getElementById('bpm').value),
@@ -1704,6 +1737,7 @@
 
 
     async function addPatientAndRetrain() {
+      if (!validateForm()) return;
       const btn = document.getElementById('add-btn');
       const errBox = document.getElementById('error-box');
       errBox.style.display = 'none';
@@ -1750,6 +1784,7 @@
 
     // ── Run prediction ─────────────────────────────────────────────────────────
     async function runPrediction() {
+      if (!validateForm()) return;
       const btn = document.getElementById('predict-btn');
       const errBox = document.getElementById('error-box');
       errBox.style.display = 'none';

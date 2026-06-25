@@ -261,29 +261,33 @@ def add_patient(patient: PatientAddInput):
 
     # ── Retrain using MongoDB data + original CSV ─────────────────────────────
     try:
-        # Load original CSV data
-        df_csv = pd.read_csv(data_path)
+        REQUIRED = ['age','gender','condition','comorbidity','bpm','mode','peep','lpm',
+                    'pulse','bp_systolic','bp_diastolic','gcs_score','cvs_score',
+                    'spo2_before','spo2_5min','spo2_10min','spo2_15min',
+                    'spo2_20min','spo2_25min','spo2_30min','outcome']
 
-        # Load MongoDB data if connected
+        # Load original CSV data - keep only required columns
+        df_csv = pd.read_csv(data_path)
+        df_csv = df_csv[[c for c in REQUIRED if c in df_csv.columns]]
+
+        # Load MongoDB data if connected - exclude non-training fields
         if patients_col is not None:
-            mongo_records = list(patients_col.find({}, {'_id': 0, 'added_at': 0, 'photo_urls': 0}))
+            mongo_records = list(patients_col.find(
+                {}, {'_id': 0, 'added_at': 0, 'photo_urls': 0}
+            ))
             if mongo_records:
                 df_mongo = pd.DataFrame(mongo_records)
-                # Combine CSV + MongoDB data
+                df_mongo = df_mongo[[c for c in REQUIRED if c in df_mongo.columns]]
                 df_all = pd.concat([df_csv, df_mongo], ignore_index=True)
-                # Drop duplicates only on key columns, not all
-                df_all = df_all.drop_duplicates(subset=['age','gender','condition','bpm','spo2_before','spo2_30min','outcome'])
             else:
                 df_all = df_csv
         else:
             df_all = df_csv
 
-        # Retrain model - keep ONLY required columns
-        REQUIRED = ['age','gender','condition','comorbidity','bpm','mode','peep','lpm',
-                    'pulse','bp_systolic','bp_diastolic','gcs_score','cvs_score',
-                    'spo2_before','spo2_5min','spo2_10min','spo2_15min',
-                    'spo2_20min','spo2_25min','spo2_30min','outcome']
+        # Final cleanup - ensure no list/object columns remain
         df_all = df_all[[c for c in REQUIRED if c in df_all.columns]]
+        df_all = df_all.dropna(subset=['outcome'])
+        df_all = df_all.reset_index(drop=True)
 
         from .retrain import run_retraining_with_data
         run_retraining_with_data(df_all)
@@ -361,8 +365,8 @@ def admin_login(data: LoginInput):
     # Check if any admin exists, if not create default
     if db["admins"].count_documents({}) == 0:
         db["admins"].insert_one({
-            "username": "admin",
-            "password": hash_password("admin123"),
+            "username": "ambuadmin",
+            "password": hash_password("NeuO@2024#Inspire"),
             "role": "superadmin"
         })
     
