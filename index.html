@@ -1094,15 +1094,6 @@
           <div class="status-dot" id="status-dot"></div>
           <span id="status-text">Connecting...</span>
         </div>
-        <button onclick="shareApp()" id="share-btn" title="Share AmbuPredict" style="
-          background: var(--surface2); border: 1px solid var(--border);
-          color: var(--text); border-radius: 8px; padding: 6px 12px;
-          cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600;
-          font-size: 13px; display: flex; align-items: center; gap: 6px;
-          transition: all .2s;
-        " onmouseover="this.style.borderColor='var(--accent)'; this.style.color='var(--accent)';" onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text)';">
-          🔗 Share
-        </button>
         <div class="header-badge">v1.0 · Clinical</div>
       </div>
     </header>
@@ -2350,6 +2341,39 @@
     });
   </script>
   <script>
+    // ── Floating Share Button (always visible) ────────────────────────────────
+    window.addEventListener('load', () => {
+      const shareBtn = document.createElement('button');
+      shareBtn.id = 'pwa-share-btn';
+      shareBtn.innerHTML = '🔗 Share';
+      shareBtn.title = 'Share AmbuPredict';
+      shareBtn.style.cssText = `
+        position: fixed; bottom: 20px; right: 20px; z-index: 9997;
+        background: var(--surface, rgba(20,25,35,0.9)); border: 1px solid rgba(0,242,254,0.3);
+        color: #00f2fe; font-family: 'Outfit', sans-serif; font-weight: 700;
+        font-size: 13px; padding: 10px 16px; border-radius: 50px;
+        cursor: pointer; backdrop-filter: blur(8px);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        transition: all .2s;
+      `;
+      shareBtn.onmouseover = () => { shareBtn.style.borderColor = '#00f2fe'; shareBtn.style.background = 'rgba(0,242,254,0.1)'; };
+      shareBtn.onmouseout = () => { shareBtn.style.borderColor = 'rgba(0,242,254,0.3)'; shareBtn.style.background = 'var(--surface, rgba(20,25,35,0.9))'; };
+      shareBtn.onclick = shareApp;
+      document.body.appendChild(shareBtn);
+      repositionFloatingButtons();
+    });
+
+    function repositionFloatingButtons() {
+      const installBtn = document.getElementById('pwa-install-btn');
+      const shareBtn = document.getElementById('pwa-share-btn');
+      if (installBtn && shareBtn) {
+        // Install button takes the primary spot, share sits to its left
+        shareBtn.style.right = '170px';
+      } else if (shareBtn) {
+        shareBtn.style.right = '20px';
+      }
+    }
+
     // ── Share App ──────────────────────────────────────────────────────────────
     async function shareApp() {
       const shareData = {
@@ -2413,11 +2437,13 @@
         deferredPrompt = null;
       };
       document.body.appendChild(installBtn);
+      repositionFloatingButtons();
     });
 
     window.addEventListener('appinstalled', () => {
       const btn = document.getElementById('pwa-install-btn');
       if (btn) btn.remove();
+      repositionFloatingButtons();
     });
   </script>
 </body>
