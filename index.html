@@ -1094,6 +1094,15 @@
           <div class="status-dot" id="status-dot"></div>
           <span id="status-text">Connecting...</span>
         </div>
+        <button onclick="shareApp()" id="share-btn" title="Share AmbuPredict" style="
+          background: var(--surface2); border: 1px solid var(--border);
+          color: var(--text); border-radius: 8px; padding: 6px 12px;
+          cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600;
+          font-size: 13px; display: flex; align-items: center; gap: 6px;
+          transition: all .2s;
+        " onmouseover="this.style.borderColor='var(--accent)'; this.style.color='var(--accent)';" onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text)';">
+          🔗 Share
+        </button>
         <div class="header-badge">v1.0 · Clinical</div>
       </div>
     </header>
@@ -2341,6 +2350,33 @@
     });
   </script>
   <script>
+    // ── Share App ──────────────────────────────────────────────────────────────
+    async function shareApp() {
+      const shareData = {
+        title: 'AmbuPredict — Ventilation Outcome Predictor',
+        text: 'AI-powered ventilation outcome prediction for NeuO In-Spire Resuscitator. Check it out!',
+        url: window.location.href.split('?')[0].split('#')[0]
+      };
+
+      if (navigator.share) {
+        try {
+          await navigator.share(shareData);
+        } catch (e) {
+          if (e.name !== 'AbortError') copyLinkFallback(shareData.url);
+        }
+      } else {
+        copyLinkFallback(shareData.url);
+      }
+    }
+
+    function copyLinkFallback(url) {
+      navigator.clipboard.writeText(url).then(() => {
+        showToast('Link Copied! 🔗', 'Share it with your team', 'success');
+      }).catch(() => {
+        showToast('Share AmbuPredict', url, 'info', 6000);
+      });
+    }
+
     // ── PWA Service Worker Registration ───────────────────────────────────────
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
